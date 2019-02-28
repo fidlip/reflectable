@@ -3989,13 +3989,7 @@ $code
 final _memberSymbolMap = ${world.generateSymbolMap()};
 
 initializeReflectable() {
-  Map<r.Reflectable, r.ReflectorData> data;
-  try {
-    data = r.data;
-  } on StateError {
-    data = r.data = <r.Reflectable, r.ReflectorData>{};
-  }
-  data.addAll(_data);
+  r.appendData(_data);
   r.memberSymbolMap = _memberSymbolMap;
 }
 """;

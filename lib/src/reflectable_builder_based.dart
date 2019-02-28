@@ -120,6 +120,53 @@ class ReflectorData {
       this.libraryMirrors,
       this.parameterListShapes);
 
+  /// Concatenate lists into one
+  ///
+  /// Returns new list of the same type. If the only one list is passed, return this list
+  static T joinLists<T extends List>(List<T> lists, T createNew()) {
+    if (lists == null || lists.length == 0) return null;
+    if (lists.length == 1) return lists[0];
+    List destination = createNew();
+    bool anyAdded;
+    lists?.forEach((list) {
+      if (list != null) {
+        destination.addAll(list);
+        anyAdded = true;
+      }
+    });
+
+    return anyAdded == true ? destination : null;
+
+  }
+
+  /// Joins two reflector data into new instance
+  //
+  // Returns new instance with concatenated inner data. If one argument is null,
+  // the other is returned and no new instance is created
+  factory ReflectorData.joinData(ReflectorData data1, ReflectorData data2) {
+    if (data1 == null) return data2;
+    else if (data2 == null) return data1;
+
+    // Sorting order of typeMirrors matters
+    var typeMirrors = joinLists<List<TypeMirror>>([
+      data1.typeMirrors.where((mirror) => mirror is ClassMirrorBase).toList(),
+      data2.typeMirrors.where((mirror) => mirror is ClassMirrorBase).toList(),
+      data1.typeMirrors.where((mirror) => mirror is! ClassMirrorBase).toList(),
+      data2.typeMirrors.where((mirror) => mirror is! ClassMirrorBase).toList()], ()=> List<TypeMirror>());
+
+    return ReflectorData(
+        typeMirrors,
+        joinLists([data1.memberMirrors, data2.memberMirrors], () => List<DeclarationMirror>()),
+        joinLists([data1.parameterMirrors, data2.parameterMirrors], () => List<ParameterMirror>()),
+        joinLists([data1.types, data2.types], () => List<Type>()),
+        data1.supportedClassCount + data2.supportedClassCount,
+        Map<String, Object Function(Object)>()..addAll(data1.getters ?? {})..addAll(data2.getters ?? {}),
+        Map<String, Object Function(Object,Object)>()..addAll(data1.setters ?? {})..addAll(data2.setters ?? {}),
+        joinLists([data1.libraryMirrors, data2.libraryMirrors], () => List<LibraryMirror>()),
+        joinLists([data1.parameterListShapes, data2.parameterListShapes], () => List<List<dynamic>>())
+    );
+  }
+
   /// Returns a class-mirror for the given [type].
   ///
   /// Returns `null` if the given class is not marked for reflection.
@@ -168,6 +215,19 @@ class ReflectorData {
 const String pleaseInitializeMessage = "Reflectable has not been initialized.\n"
     "Please make sure that the first action taken by your program\n"
     "in `main` is to call `initializeReflectable()`.";
+
+appendData(Map<Reflectable, ReflectorData> newData) {
+  Map<Reflectable, ReflectorData> _data;
+  try {
+    _data = data;
+  } on StateError {
+    _data = data = <Reflectable, ReflectorData>{};
+  }
+  newData.forEach((reflector, newRefData) {
+    _data[reflector] = ReflectorData.joinData(_data[reflector], newRefData);
+  });
+}
+
 
 /// This mapping contains the mirror-data for each reflector.
 /// It will be initialized in the generated code.
